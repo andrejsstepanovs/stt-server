@@ -16,3 +16,4 @@ services:
 
     environment:
       - PYTHONUNBUFFERED=1
+      - UV_CONCURRENT_DOWNLOADS=1

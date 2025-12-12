@@ -1,35 +1,41 @@
-# Use a slim Python image to keep size down
-FROM python:3.11-slim
+# 1. Base Image: Includes Python and uv pre-installed
+#    (Replace '3.12' with the version you need, e.g., 3.10, 3.11)
+FROM astral/uv:python3.14-trixie
 
-# --- 1. SYSTEM DEPENDENCIES ---
-# libportaudio2: Required by 'sounddevice' to access microphone
-# alsa-utils:    Provides 'arecord' to debug audio devices inside container
-# git:           Often needed if installing dependencies from git repositories
-RUN apt-get update && apt-get install -y \
-    libportaudio2 \
-    alsa-utils \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
-# --- 2. WORKDIR & DEPENDENCIES ---
+# 2. Set working directory
 WORKDIR /app
 
-# Copy requirements first to leverage Docker layer caching
-COPY requirements.txt .
+# 3. Optimization: Compile bytecode to make startup slightly faster
+ENV UV_COMPILE_BYTECODE=1
 
-# Install Python dependencies
-# We use --no-cache-dir to keep the image smaller
-RUN pip install --no-cache-dir -r requirements.txt
+# 4. Dependency Caching Step (The most important part!)
+#    We copy ONLY the lockfiles first. Docker will cache the next 'RUN' step
+#    forever, unless you actually change your dependencies.
+COPY pyproject.toml uv.lock ./
 
-COPY asound.conf /etc/asound.conf
+# 5. Install dependencies
+#    --frozen: Ensures we use exactly the versions in uv.lock
+#    --no-dev: Skips development tools (like pytest/black) to keep image small
+#    --no-install-project: Installs libraries but waits on your specific code
+RUN uv sync --frozen --no-dev --no-install-project -v
 
-# --- 3. APPLICATION CODE ---
+RUN apt-get update && apt-get install -y \
+    portaudio19-dev \
+    libasound2-dev \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# 6. Copy Source Code
+#    This changes often, so we do it last to avoid breaking the cache above.
+COPY asound.conf .
 COPY audio_transcriber.py .
 COPY server.py .
 
-# Expose the API port
-EXPOSE 8000
+# 7. (Optional) Final Sync
+#    If you just have scripts, this does nothing. 
+#    If your project itself is a package, this installs it.
+RUN uv sync --frozen --no-dev
 
-# --- 4. STARTUP ---
-# We use 'python -u' (unbuffered) so logs show up immediately in Docker
-CMD ["python", "-u", "server.py"]
+# 8. Run Command
+#    'uv run' ensures the environment is valid and executes your script.
+CMD ["uv", "run", "server.py"]
