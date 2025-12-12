@@ -82,3 +82,14 @@ curl -X POST http://localhost:8000/wakeword \
            "wakewords": ["hey computer", "start recording", "stop"],
            "timeout": 30
          }'
+
+### 2. Audio Transcribing
+
+This allows to transcribe audio with streaming back transcribed text.
+
+**Example (cURL):**
+
+```bash
+curl -N http://localhost:8000/stream
+```
+
