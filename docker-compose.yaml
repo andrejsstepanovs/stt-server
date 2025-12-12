@@ -1,27 +1,18 @@
 services:
-  stt-service:
+  stt:
     build: .
     container_name: stt
     restart: unless-stopped
     ports:
       - "8000:8000"
     
-    # --- AUDIO CONFIGURATION (The Trick) ---
+    # --- AUDIO CONFIGURATION ---
     devices:
-      # Maps the host's sound card directly to the container
       - "/dev/snd:/dev/snd"
     
-    # --- GPU CONFIGURATION ---
-    # This enables CUDA for Whisper
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
+    # Optional: ensure container has permission to access audio group
+    group_add:
+      - audio
 
-    # --- ENVIRONMENT ---
     environment:
-      # Forces Python to print logs immediately (useful for seeing transcription)
       - PYTHONUNBUFFERED=1

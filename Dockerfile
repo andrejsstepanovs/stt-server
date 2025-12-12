@@ -21,6 +21,8 @@ COPY requirements.txt .
 # We use --no-cache-dir to keep the image smaller
 RUN pip install --no-cache-dir -r requirements.txt
 
+COPY asound.conf /etc/asound.conf
+
 # --- 3. APPLICATION CODE ---
 COPY audio_transcriber.py .
 COPY server.py .
