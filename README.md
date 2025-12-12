@@ -82,6 +82,7 @@ curl -X POST http://localhost:8000/wakeword \
            "wakewords": ["hey computer", "start recording", "stop"],
            "timeout": 30
          }'
+```
 
 ### 2. Audio Transcribing
 
