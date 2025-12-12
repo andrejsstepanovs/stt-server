@@ -29,19 +29,12 @@ This project is optimized for `uv`, a fast Python package installer and resolver
 
 **Steps:**
 
-1.  **Initialize Virtual Environment**:
+## Init, download deps and run
+
     ```bash
     uv venv
     source .venv/bin/activate
-    ```
-
-2.  **Install Dependencies**:
-    ```bash
-    uv pip install -r requirements.txt
-    ```
-
-3.  **Run the Server**:
-    ```bash
+    uv sync
     uv run server.py
     ```
 
