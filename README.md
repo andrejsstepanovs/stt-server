@@ -11,45 +11,41 @@ This project implements a high-performance, local Speech-to-Text (STT) service u
 * **VAD (Voice Activity Detection)**: Efficient silence detection to only process audio when speech is detected.
 * **Async Server**: Built on FastAPI to handle multiple clients simultaneously.
 * **Broadcast Architecture**: One microphone input can serve multiple wakeword listeners or stream consumers at the same time.
-* **Dockerized**: ready-to-deploy container setup with hardware access (Audio/GPU).
-
----
-
-## Project Structure
-
-* `server.py`: The FastAPI application. It manages the background "Dispatcher" and exposes the HTTP endpoints.
-* `audio_transcriber.py`: The core engine. Handles audio capture (SoundDevice), VAD logic, and Whisper inference.
-* `Dockerfile` & `docker-compose.yaml`: Configuration for containerized deployment.
+* **Dockerized**: Ready-to-deploy container setup with hardware access (Audio/GPU).
 
 ---
 
 ## Installation & Usage
 
-### Option A: Running Locally (Python)
+### Option A: Running Locally with uv (Recommended)
+
+This project is optimized for `uv`, a fast Python package installer and resolver.
 
 **Prerequisites:**
-* Python 3.10+
+* `uv` installed (`wget -qO- https://astral.sh/uv/install.sh | sh`)
 * `portaudio` installed on your system (required for microphone access).
     * Ubuntu/Debian: `sudo apt-get install libportaudio2`
     * MacOS: `brew install portaudio`
 
-**Setup:**
+**Steps:**
 
-1.  **Install Dependencies** (using `uv` or `pip`):
+1.  **Initialize Virtual Environment**:
     ```bash
-    # Using standard pip
-    pip install -r requirements.txt
+    uv venv
+    source .venv/bin/activate
+    ```
 
-    # OR using uv (faster)
+2.  **Install Dependencies**:
+    ```bash
     uv pip install -r requirements.txt
     ```
 
-2.  **Run the Server**:
+3.  **Run the Server**:
     ```bash
-    python server.py
+    uv run server.py
     ```
 
-### Option B: Running with Docker (Recommended)
+### Option B: Running with Docker
 
 This method isolates dependencies but requires passing hardware access (Mic & GPU) to the container.
 
@@ -66,10 +62,23 @@ This method isolates dependencies but requires passing hardware access (Mic & GP
 
 The server listens on `http://0.0.0.0:8000`.
 
-### 1. Live Transcription Stream (`GET /stream`)
+### 1. Wakeword Detection (`POST /wakeword`)
 
-Streams transcription results line-by-line using **Server-Sent Events (SSE)**. Useful for debugging or displaying live captions.
+This is the primary endpoint for automation. It is a **long-polling** endpoint. When you call it, the request will "hang" (wait) until one of the specified wakewords is detected in the live audio stream.
 
-**Example Request:**
+**Request Body:**
+
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `wakewords` | `List[str]` | A list of phrases to listen for (case-insensitive). |
+| `timeout` | `int` | (Optional) Max seconds to wait before giving up. Default: 60. |
+
+**Example Usage (cURL):**
+
 ```bash
-curl -N http://localhost:8000/stream
+curl -X POST http://localhost:8000/wakeword \
+     -H "Content-Type: application/json" \
+     -d '{
+           "wakewords": ["hey computer", "start recording", "stop"],
+           "timeout": 30
+         }'
