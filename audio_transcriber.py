@@ -15,6 +15,7 @@ warnings.filterwarnings("ignore")
 class AudioTranscriber:
     def __init__(self, 
                  model_name="openai/whisper-tiny.en", 
+                 language="en",
                  device=None, 
                  mic_gain=10.0,
                  debug_mode=False):
@@ -22,6 +23,7 @@ class AudioTranscriber:
         self.debug_mode = debug_mode
         self.device = device if device else ("cuda" if torch.cuda.is_available() else "cpu")
         self.mic_gain = mic_gain
+        self.language = language
         
         # --- CONFIGURATION ---
         self.MODEL_RATE = 16000     # Whisper expects 16k
@@ -29,8 +31,8 @@ class AudioTranscriber:
         self.BLOCK_SIZE_MS = 30      
         self.START_THRESHOLD = 0.048
         self.END_THRESHOLD = 0.043   
-        self.SILENCE_DURATION = 0.5      
-        self.PRE_RECORD_SECONDS = 0.5    
+        self.SILENCE_DURATION = 0.5       
+        self.PRE_RECORD_SECONDS = 0.5     
         self.MIN_AUDIO_DURATION_S = 0.3
         
         # --- STATE ---
@@ -50,6 +52,18 @@ class AudioTranscriber:
         self.processor = WhisperProcessor.from_pretrained(model_name)
         self.model = WhisperForConditionalGeneration.from_pretrained(model_name).to(self.device)
         self.model.eval()
+        
+        # --- MULTILINGUAL CONFIGURATION ---
+        # English-only models (.en) throw an error if you try to pass a language argument.
+        # Multilingual models require it if you want to force a specific output language.
+        self.forced_decoder_ids = None
+        if not model_name.endswith(".en"):
+            if self.debug_mode:
+                print(f"[INFO] Multilingual model detected. Forcing language: {self.language}")
+            self.forced_decoder_ids = self.processor.get_decoder_prompt_ids(
+                language=self.language, 
+                task="transcribe"
+            )
         
         if self.debug_mode:
             print("[INFO] Model loaded successfully.")
@@ -111,13 +125,20 @@ class AudioTranscriber:
                 )
                 input_features = inputs.input_features.to(self.device)
                 attention_mask = torch.ones(input_features.shape, device=self.device)
+                
+                # Configure generation arguments
                 gen_kwargs = {"max_new_tokens": 128}
+                
+                # Apply language forcing if applicable
+                if self.forced_decoder_ids is not None:
+                    gen_kwargs["forced_decoder_ids"] = self.forced_decoder_ids
                 
                 predicted_ids = self.model.generate(
                     input_features, 
                     attention_mask=attention_mask,
                     **gen_kwargs
                 )
+                
                 text = self.processor.batch_decode(predicted_ids, skip_special_tokens=True)[0].strip()
                 
                 if text:
@@ -131,12 +152,9 @@ class AudioTranscriber:
                 if self.debug_mode: print(f"[ERROR] Inference Worker: {e}")
 
     def _capture_worker(self):
-        # Calculate block size in samples based on CAPTURE RATE (e.g. 48000)
+        # Calculate block size in samples based on CAPTURE RATE
         block_size_s = self.BLOCK_SIZE_MS / 1000
         block_size_samples = int(self.CAPTURE_RATE * block_size_s)
-        
-        # Buffers operate on Logic Blocks (resampled), so we calculate buffer len based on MODEL_RATE chunks?
-        # Actually simplest is to buffer chunks *after* resampling.
         
         pre_buffer_len = int(self.PRE_RECORD_SECONDS * 1000 / self.BLOCK_SIZE_MS) 
         pre_speech_buffer = deque(maxlen=pre_buffer_len)
@@ -212,4 +230,3 @@ class AudioTranscriber:
         except Exception as e:
             print(f"[CRITICAL] Microphone failed: {e}")
             self._running.clear()
-

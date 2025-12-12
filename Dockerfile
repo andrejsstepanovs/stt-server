@@ -25,6 +25,18 @@ RUN apt-get update && apt-get install -y \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
+# 3. PRE-DOWNLOAD STEP
+#    We use a small inline script to download the default model during the build.
+#    This makes the image bigger, but startup instant.
+#    If the user changes the model in ENV vars later, it will download the new one at runtime.
+RUN uv run python -c "from transformers import WhisperProcessor, WhisperForConditionalGeneration; \
+    m='openai/whisper-tiny.en'; \
+    print(f'Pre-downloading {m}...'); \
+    WhisperProcessor.from_pretrained(m); \
+    WhisperForConditionalGeneration.from_pretrained(m);"
+
+
+
 # 6. Copy Source Code
 #    This changes often, so we do it last to avoid breaking the cache above.
 COPY asound.conf .

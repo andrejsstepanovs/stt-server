@@ -17,3 +17,17 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - UV_CONCURRENT_DOWNLOADS=1
+
+      # Change this to "openai/whisper-large-v3" or "openai/whisper-tiny" etc.
+      - WHISPER_MODEL=openai/whisper-tiny.en
+      # Change this to "fr", "de", "es" etc. (Only works on multilingual models, not .en)
+      - WHISPER_LANGUAGE=en
+      - DEBUG_MODE=true
+      # Ensure the app uses the cached directory
+      - HF_HOME=/app/model_cache
+    volumes:
+      # Persist downloaded models so you don't re-download on every container recreation
+      - whisper_models:/app/model_cache
+
+volumes:
+  whisper_models:

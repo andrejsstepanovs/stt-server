@@ -1,5 +1,6 @@
 import asyncio
 import uvicorn
+import os
 from fastapi import FastAPI, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -9,39 +10,32 @@ from contextlib import asynccontextmanager
 # Import our class from the previous file
 from audio_transcriber import AudioTranscriber
 
+# --- CONFIGURATION FROM ENV ---
+# Defaults allow it to still run without Docker Compose
+MODEL_NAME = os.getenv("WHISPER_MODEL", "openai/whisper-base.en")
+TARGET_LANGUAGE = os.getenv("WHISPER_LANGUAGE", "en") 
+DEBUG_MODE = os.getenv("DEBUG_MODE", "true").lower() == "true"
+
 # --- GLOBAL STATE ---
 transcriber_engine = None
 dispatcher_task = None
-active_queues = []  # List of asyncio.Queues for currently connected clients
+active_queues = [] 
 
 class WakewordRequest(BaseModel):
     wakewords: List[str]
-    timeout: int = 60  # Stop listening after 60s if nothing found
+    timeout: int = 60 
 
 async def transcription_dispatcher():
-    """
-    Background task:
-    1. Reads from the synchronous AudioTranscriber generator.
-    2. Broadcasts the text to all active async queues (connected clients).
-    """
+    # ... (Keep this function exactly the same as before) ...
     print("[SERVER] Dispatcher started.")
-    
-    # We run the synchronous generator in a thread executor to avoid blocking the async event loop
     loop = asyncio.get_event_loop()
-    
-    # Create an iterator from the synchronous generator
     transcriber_iter = transcriber_engine.transcribe()
 
     while True:
         try:
-            # Run the blocking next() call in a separate thread
             text = await loop.run_in_executor(None, next, transcriber_iter)
-            
-            # Broadcast to all connected clients
-            # We iterate a copy of the list to avoid modification issues
             for q in list(active_queues):
                 await q.put(text)
-                
         except StopIteration:
             break
         except Exception as e:
@@ -50,19 +44,22 @@ async def transcription_dispatcher():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handles startup and shutdown logic."""
     global transcriber_engine, dispatcher_task
     
-    # 1. Start the Audio Engine
-    transcriber_engine = AudioTranscriber(model_name="openai/whisper-base.en", debug_mode=True)
+    print(f"[SERVER] Starting with Model: {MODEL_NAME}, Language: {TARGET_LANGUAGE}")
+
+    # Pass the env vars to the engine
+    transcriber_engine = AudioTranscriber(
+        model_name=MODEL_NAME, 
+        language=TARGET_LANGUAGE,
+        debug_mode=DEBUG_MODE
+    )
     transcriber_engine.start()
     
-    # 2. Start the Dispatcher (Background Broadcast)
     dispatcher_task = asyncio.create_task(transcription_dispatcher())
     
     yield
     
-    # 3. Cleanup on Shutdown
     print("[SERVER] Shutting down...")
     transcriber_engine.stop()
     if dispatcher_task:
