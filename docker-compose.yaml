@@ -19,12 +19,19 @@ services:
       - UV_CONCURRENT_DOWNLOADS=1
 
       # Change this to "openai/whisper-large-v3" or "openai/whisper-tiny" etc.
-      - WHISPER_MODEL=openai/whisper-tiny.en
+      - WHISPER_MODEL=openai/whisper-base.en
       # Change this to "fr", "de", "es" etc. (Only works on multilingual models, not .en)
       - WHISPER_LANGUAGE=en
       - DEBUG_MODE=true
       # Ensure the app uses the cached directory
       - HF_HOME=/app/model_cache
+
+      # Raspberry pi
+      - OMP_NUM_THREADS=4
+      - MKL_NUM_THREADS=4
+      - PYTORCH_NUM_THREADS=4
+      - TORCH_NUM_THREADS=4
+
     volumes:
       # Persist downloaded models so you don't re-download on every container recreation
       - whisper_models:/app/model_cache

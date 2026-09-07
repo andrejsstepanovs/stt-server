@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y \
 #    This makes the image bigger, but startup instant.
 #    If the user changes the model in ENV vars later, it will download the new one at runtime.
 RUN uv run python -c "from transformers import WhisperProcessor, WhisperForConditionalGeneration; \
-    m='openai/whisper-tiny.en'; \
+    m='openai/whisper-base.en'; \
     print(f'Pre-downloading {m}...'); \
     WhisperProcessor.from_pretrained(m); \
     WhisperForConditionalGeneration.from_pretrained(m);"
